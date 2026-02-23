@@ -246,7 +246,10 @@ L'URL sera automatiquement préfixée avec `https://eddb.unifr.ch/noco/`.
 map: {
   defaultCenter: [number, number],  // [latitude, longitude]
   defaultZoom: number,               // Niveau de zoom (1-20)
-  clusterRadius: number              // Rayon de clustering en pixels
+  clusterRadius: number,             // Rayon de clustering en pixels
+  markerColors?: {
+    field: string                    // Champ utilisé pour colorer les points
+  }
 }
 ```
 
@@ -256,9 +259,20 @@ map: {
 map: {
   defaultCenter: [46.8, 8.2],
   defaultZoom: 8,
-  clusterRadius: 50
+  clusterRadius: 50,
+  markerColors: {
+    field: 'TimeOfEmergence'
+  }
 }
 ```
+
+#### Couleurs des points par champ
+
+Si `map.markerColors.field` est défini, chaque valeur distincte de ce champ reçoit automatiquement une couleur différente.
+
+- Les couleurs sont générées automatiquement avec un espacement fort pour rester distinguables.
+- Les valeurs vides sont regroupées dans la catégorie `Unknown`.
+- Pour les champs multi-valeurs, la première valeur non vide est utilisée pour choisir la couleur.
 
 ### Menu de filtres
 

@@ -42,6 +42,11 @@ interface FilterState {
 }
 
 const imageCache = new globalThis.Map<string, string>()
+const DEFAULT_MARKER_COLOR = 'oklch(0.45 0.15 250)'
+const MARKER_CENTER_COLOR = 'oklch(0.98 0 0)'
+const UNKNOWN_MARKER_COLOR = 'hsl(220 8% 45%)'
+const DEFAULT_COLOR_CATEGORY = '__default__'
+const GOLDEN_ANGLE = 137.508
 
 function getPropertyLabel(field: string): string {
   const property = config.properties.find(p => p.field === field)
@@ -95,6 +100,93 @@ function getPropertyValue(record: any, property: PropertyConfig): string[] {
   return [String(value)]
 }
 
+function hashString(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+function generateDistinctColor(index: number, seed: number): string {
+  const hue = (seed % 360 + index * GOLDEN_ANGLE) % 360
+  const saturation = 72 - (index % 3) * 8
+  const lightness = 45 + (Math.floor(index / 3) % 2) * 8
+  return `hsl(${hue.toFixed(1)} ${saturation}% ${lightness}%)`
+}
+
+function createMarkerIcon(color: string): L.DivIcon {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `
+      <div style="
+        background-color: ${color};
+        border: 3px solid ${MARKER_CENTER_COLOR};
+        border-radius: 50% 50% 50% 0;
+        width: 28px;
+        height: 28px;
+        transform: rotate(-45deg);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div style="
+          width: 10px;
+          height: 10px;
+          background-color: ${MARKER_CENTER_COLOR};
+          border-radius: 50%;
+        "></div>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -28]
+  })
+}
+
+function getMarkerColorCategory(record: ApiRecord, colorProperty: PropertyConfig | null): string {
+  if (!colorProperty) {
+    return DEFAULT_COLOR_CATEGORY
+  }
+
+  const values = getPropertyValue(record, colorProperty)
+  if (values.length === 0) {
+    return 'Unknown'
+  }
+
+  return values[0]
+}
+
+function buildMarkerColorMap(records: ApiRecord[], colorProperty: PropertyConfig | null): Map<string, string> {
+  const colorMap = new globalThis.Map<string, string>()
+  colorMap.set(DEFAULT_COLOR_CATEGORY, DEFAULT_MARKER_COLOR)
+
+  if (!colorProperty || records.length === 0) {
+    return colorMap
+  }
+
+  const categorySet = new Set<string>()
+  records.forEach(record => {
+    categorySet.add(getMarkerColorCategory(record, colorProperty))
+  })
+
+  const categories = Array.from(categorySet)
+    .filter(category => category !== 'Unknown')
+    .sort((a, b) => a.localeCompare(b))
+
+  const seed = hashString(`${colorProperty.field}|${categories.join('|')}`)
+  categories.forEach((category, index) => {
+    colorMap.set(category, generateDistinctColor(index, seed))
+  })
+
+  if (categorySet.has('Unknown')) {
+    colorMap.set('Unknown', UNKNOWN_MARKER_COLOR)
+  }
+
+  return colorMap
+}
+
 export function Map({ onPointCountChange }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<L.Map | null>(null)
@@ -125,6 +217,23 @@ export function Map({ onPointCountChange }: MapProps) {
     config.properties.filter(p => p.filter === null || p.filter.type === 'standard'), 
     []
   )
+  const colorProperty = useMemo<PropertyConfig | null>(() => {
+    const colorField = config.map.markerColors?.field
+    if (!colorField) {
+      return null
+    }
+
+    return config.properties.find(property => property.field === colorField) || {
+      field: colorField,
+      filter: null
+    }
+  }, [])
+  const markerColorsByCategory = useMemo(() => {
+    if (!apiData) {
+      return buildMarkerColorMap([], colorProperty)
+    }
+    return buildMarkerColorMap(apiData, colorProperty)
+  }, [apiData, colorProperty])
 
   useEffect(() => {
     if (standardFilterProperties.length > 0 && !selectedFilter) {
@@ -240,33 +349,7 @@ export function Map({ onPointCountChange }: MapProps) {
           zoomToBoundsOnClick: true
         })
 
-        const customIcon = L.divIcon({
-          className: 'custom-marker',
-          html: `
-            <div style="
-              background-color: oklch(0.45 0.15 250);
-              border: 3px solid oklch(0.98 0 0);
-              border-radius: 50% 50% 50% 0;
-              width: 28px;
-              height: 28px;
-              transform: rotate(-45deg);
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            ">
-              <div style="
-                width: 10px;
-                height: 10px;
-                background-color: oklch(0.98 0 0);
-                border-radius: 50%;
-              "></div>
-            </div>
-          `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 28],
-          popupAnchor: [0, -28]
-        })
+        const initialMarkerColors = buildMarkerColorMap(allRecords, colorProperty)
 
         markerClusterGroup.current = markers
 
@@ -279,7 +362,11 @@ export function Map({ onPointCountChange }: MapProps) {
               const lng = parseFloat(parts[1])
               
               if (!isNaN(lat) && !isNaN(lng)) {
-                const marker = L.marker([lat, lng], { icon: customIcon })
+                const markerCategory = getMarkerColorCategory(record, colorProperty)
+                const markerColor = initialMarkerColors.get(markerCategory)
+                  || initialMarkerColors.get('Unknown')
+                  || DEFAULT_MARKER_COLOR
+                const marker = L.marker([lat, lng], { icon: createMarkerIcon(markerColor) })
                 
                 const title = record[config.popup.titleField] || 'Untitled'
                 
@@ -421,34 +508,6 @@ export function Map({ onPointCountChange }: MapProps) {
     markerClusterGroup.current.clearLayers()
     markerMapRef.current.clear()
 
-    const customIcon = L.divIcon({
-      className: 'custom-marker',
-      html: `
-        <div style="
-          background-color: oklch(0.45 0.15 250);
-          border: 3px solid oklch(0.98 0 0);
-          border-radius: 50% 50% 50% 0;
-          width: 28px;
-          height: 28px;
-          transform: rotate(-45deg);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-          <div style="
-            width: 10px;
-            height: 10px;
-            background-color: oklch(0.98 0 0);
-            border-radius: 50%;
-          "></div>
-        </div>
-      `,
-      iconSize: [28, 28],
-      iconAnchor: [14, 28],
-      popupAnchor: [0, -28]
-    })
-
     let validPoints = 0
     apiData.forEach(record => {
       for (const property of standardFilterProperties) {
@@ -490,7 +549,11 @@ export function Map({ onPointCountChange }: MapProps) {
           const lng = parseFloat(parts[1])
           
           if (!isNaN(lat) && !isNaN(lng)) {
-            const marker = L.marker([lat, lng], { icon: customIcon })
+            const markerCategory = getMarkerColorCategory(record, colorProperty)
+            const markerColor = markerColorsByCategory.get(markerCategory)
+              || markerColorsByCategory.get('Unknown')
+              || DEFAULT_MARKER_COLOR
+            const marker = L.marker([lat, lng], { icon: createMarkerIcon(markerColor) })
             
             const title = record[config.popup.titleField] || 'Untitled'
             
@@ -588,7 +651,7 @@ export function Map({ onPointCountChange }: MapProps) {
     }
 
     onPointCountChange?.(validPoints)
-  }, [filterStates, booleanFilterStates, apiData, onPointCountChange, standardFilterProperties, booleanFilterProperties, displayProperties])
+  }, [filterStates, booleanFilterStates, apiData, onPointCountChange, standardFilterProperties, booleanFilterProperties, displayProperties, colorProperty, markerColorsByCategory])
 
   const handleFilterToggle = (field: string, value: string) => {
     setFilterStates(prev => {
@@ -873,6 +936,7 @@ export function Map({ onPointCountChange }: MapProps) {
               {standardFilterProperties.map(property => {
                 const state = filterStates[property.field]
                 if (!state || selectedFilter !== property.field) return null
+                const isColorFilter = colorProperty?.field === property.field
                 
                 return (
                   <div key={property.field}>
@@ -900,24 +964,36 @@ export function Map({ onPointCountChange }: MapProps) {
                       </div>
                     </div>
                     <div className="px-4 py-3 space-y-3">
-                      {state.values.map(value => (
-                        <div key={value} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${property.field}-${value}`}
-                            checked={state.selected.has(value)}
-                            onCheckedChange={() => handleFilterToggle(property.field, value)}
-                          />
-                          <Label
-                            htmlFor={`${property.field}-${value}`}
-                            className="text-sm font-normal cursor-pointer flex-1"
-                          >
-                            {value}
-                          </Label>
-                          <span className="text-xs text-muted-foreground font-medium">
-                            {state.counts[value] || 0}
-                          </span>
-                        </div>
-                      ))}
+                      {state.values.map(value => {
+                        const color = markerColorsByCategory.get(value)
+                          || markerColorsByCategory.get('Unknown')
+                          || DEFAULT_MARKER_COLOR
+
+                        return (
+                          <div key={value} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${property.field}-${value}`}
+                              checked={state.selected.has(value)}
+                              onCheckedChange={() => handleFilterToggle(property.field, value)}
+                            />
+                            {isColorFilter && (
+                              <span
+                                className="h-3.5 w-3.5 rounded-full border border-border shrink-0"
+                                style={{ backgroundColor: color }}
+                              />
+                            )}
+                            <Label
+                              htmlFor={`${property.field}-${value}`}
+                              className="text-sm font-normal cursor-pointer flex-1"
+                            >
+                              {value}
+                            </Label>
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {state.counts[value] || 0}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
@@ -964,6 +1040,7 @@ export function Map({ onPointCountChange }: MapProps) {
               {standardFilterProperties.map(property => {
                 const state = filterStates[property.field]
                 if (!state) return null
+                const isColorFilter = colorProperty?.field === property.field
                 
                 return (
                   <TabsContent key={property.field} value={property.field} className="mt-0">
@@ -991,24 +1068,36 @@ export function Map({ onPointCountChange }: MapProps) {
                       </div>
                     </div>
                     <div className="px-4 py-3 space-y-3">
-                      {state.values.map(value => (
-                        <div key={value} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${property.field}-${value}`}
-                            checked={state.selected.has(value)}
-                            onCheckedChange={() => handleFilterToggle(property.field, value)}
-                          />
-                          <Label
-                            htmlFor={`${property.field}-${value}`}
-                            className="text-sm font-normal cursor-pointer flex-1"
-                          >
-                            {value}
-                          </Label>
-                          <span className="text-xs text-muted-foreground font-medium">
-                            {state.counts[value] || 0}
-                          </span>
-                        </div>
-                      ))}
+                      {state.values.map(value => {
+                        const color = markerColorsByCategory.get(value)
+                          || markerColorsByCategory.get('Unknown')
+                          || DEFAULT_MARKER_COLOR
+
+                        return (
+                          <div key={value} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${property.field}-${value}`}
+                              checked={state.selected.has(value)}
+                              onCheckedChange={() => handleFilterToggle(property.field, value)}
+                            />
+                            {isColorFilter && (
+                              <span
+                                className="h-3.5 w-3.5 rounded-full border border-border shrink-0"
+                                style={{ backgroundColor: color }}
+                              />
+                            )}
+                            <Label
+                              htmlFor={`${property.field}-${value}`}
+                              className="text-sm font-normal cursor-pointer flex-1"
+                            >
+                              {value}
+                            </Label>
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {state.counts[value] || 0}
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </TabsContent>
                 )

@@ -33,6 +33,9 @@ export interface AppConfig {
     defaultCenter: [number, number]
     defaultZoom: number
     clusterRadius: number
+    markerColors?: {
+      field: string
+    }
   }
   popup: {
     titleField: string
@@ -166,7 +169,10 @@ export const config: AppConfig = {
   map: {
     defaultCenter: [46.8, 8.2],
     defaultZoom: 8,
-    clusterRadius: 50
+    clusterRadius: 50,
+    markerColors: {
+      field: 'TimeOfEmergence'
+    }
   },
   
   popup: {

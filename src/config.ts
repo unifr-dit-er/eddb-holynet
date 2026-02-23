@@ -33,6 +33,9 @@ export interface AppConfig {
     defaultCenter: [number, number]
     defaultZoom: number
     clusterRadius: number
+    markerColors?: {
+      field: string
+    }
   }
   popup: {
     titleField: string
@@ -46,60 +49,112 @@ export interface AppConfig {
 }
 
 export const config: AppConfig = {
-  appName: 'Ludus',
+  appName: 'HolyNet',
   
-  apiUrl: 'https://eddb.unifr.ch/noco/api/v2/tables/mw4mvjms6nkuq0f/records',
-  apiToken: 'hCmfVFzK4mpjHkyLJzD1U2plqzJInYmdhzQ8NrzR',
+  apiUrl: 'https://eddb.unifr.ch/noco/api/v2/tables/mnn6jpi8328qbc6/records',
+  apiToken: 'Q1cPWj4uxDBSrDqlU86Gyto77Cku7nGkvwmdbT6W',
   
-  geoDataField: 'GeoData',
+  geoDataField: 'Coordinates',
   
   properties: [
     {
-      field: 'Material',
-      filter: {
-        type: 'standard'
-      }
-    },
-    {
-      field: 'Morphology',
-      filter: {
-        type: 'standard',
-        shortLabel: 'Morph.'
-      }
-    },
-    {
-      field: 'Game',
-      filter: {
-        type: 'standard'
-      }
-    },
-    {
-      field: 'ConservationState',
-      label: 'Conservation State',
-      filter: {
-        type: 'standard',
-        shortLabel: 'State'
-      }
-    },
-    {
-      field: 'Typology',
-      filter: {
-        type: 'standard',
-        shortLabel: 'Type'
-      }
-    },
-    {
-      field: 'PleiadesId',
-      label: 'Pleiades ID',
+      field: 'TownVillage',
+      label: 'Town / Village',
       filter: null
     },
     {
-      field: 'Image',
+      field: 'HistoricalDenomination',
+      label: 'Historical Denomination',
+      filter: null
+    },
+    {
+      field: 'Coordinates',
+      label: 'Coordinates',
+      filter: null
+    },
+    {
+      field: 'Circuits',
+      label: 'Associated Circuits',
+      path: '_nc_m2m_Sites_Circuits.Circuits.Denomination',
+      filter: {
+        type: 'standard'
+      }
+    },
+    {
+      field: 'TimeOfEmergence',
+      label: 'Time of Emergence',
+      filter: {
+        type: 'standard',
+        shortLabel: 'ToE'
+      }
+    },
+    {
+      field: 'TypologyLegendaryPhysiognomy',
+      label: 'Typology - Legendary Physiognomy',
+      filter: {
+        type: 'standard',
+        shortLabel: 'Leg. Physiognomy'
+      }
+    },
+    {
+      field: 'TypologyConnectivity',
+      label: 'Typology - Connectivity',
+      filter: {
+        type: 'standard',
+        shortLabel: 'Connectivity'
+      }
+    },
+    {
+      field: 'TypologySurroundingEnvironment',
+      label: 'Typology - Surrounding Environment',
+      filter: {
+        type: 'standard',
+        shortLabel: 'Surrounding Env.'
+      }
+    },
+    {
+      field: 'CultObjectMateriality',
+      label: 'Cult Object - Materiality',
+      filter: {
+        type: 'standard',
+        shortLabel: 'CO Materiality'
+      }
+    },
+    {
+      field: 'CultObjectCulticIdentity',
+      label: 'Cult Object - Cultic Identity',
+      filter: null
+    },
+    {
+      field: 'AssociatedMemorialNetworks',
+      label: 'Associated Memorial Networks',
+      filter: {
+        type: 'standard',
+        shortLabel: 'Memorial Networks'
+      }
+    },
+    {
+      field: 'AssociatedReligiousGroups',
+      label: 'Associated Religious Groups',
+      filter: null
+    },
+    {
+      field: 'ExperientialDimension',
+      label: 'Experiential Dimension',
+      filter: null
+    },
+    {
+      field: 'History',
+      label: 'History',
+      filter: null
+    },
+    {
+      field: 'Visuals',
       label: 'Has Images',
       filter: {
         type: 'boolean',
         checkFunction: (record: any) => {
-          const imageField = 'Image'
+          const imageField = 'Visuals'
           return record[imageField] && Array.isArray(record[imageField]) && record[imageField].length > 0 && record[imageField].some((img: any) => img.signedPath)
         }
       }
@@ -114,17 +169,20 @@ export const config: AppConfig = {
   map: {
     defaultCenter: [46.8, 8.2],
     defaultZoom: 8,
-    clusterRadius: 50
+    clusterRadius: 50,
+    markerColors: {
+      field: 'Circuits'
+    }
   },
   
   popup: {
-    titleField: 'Title',
-    width: 350,
-    imageField: 'Image'
+    titleField: 'Denomination',
+    width: 500,
+    imageField: 'Visuals'
   },
   
   filterMenu: {
-    type: 'tabs'
+    type: 'dropdown'
   },
   
   eddbServiceUrl: 'https://eddb.unifr.ch'
