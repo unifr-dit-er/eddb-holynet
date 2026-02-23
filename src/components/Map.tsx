@@ -199,11 +199,26 @@ export function Map({ onPointCountChange }: MapProps) {
   const [filterStates, setFilterStates] = useState<Record<string, FilterState>>({})
   const [booleanFilterStates, setBooleanFilterStates] = useState<Record<string, boolean>>({})
   
-  const markerClusterGroup = useRef<L.MarkerClusterGroup | null>(null)
+  const markerLayerGroup = useRef<L.MarkerClusterGroup | L.FeatureGroup<L.Marker> | null>(null)
   const markerMapRef = useRef(new globalThis.Map<number, L.Marker>())
+  const [clustersEnabled, setClustersEnabled] = useState(true)
   const [showOpenById, setShowOpenById] = useState(false)
   const [inputId, setInputId] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<string>('')
+
+  const createMarkerLayerGroup = (useClusters: boolean): L.MarkerClusterGroup | L.FeatureGroup<L.Marker> => {
+    if (useClusters) {
+      return L.markerClusterGroup({
+        chunkedLoading: true,
+        maxClusterRadius: config.map.clusterRadius,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true
+      })
+    }
+
+    return L.featureGroup<L.Marker>()
+  }
 
   const standardFilterProperties = useMemo(() => 
     config.properties.filter(p => p.filter && p.filter.type === 'standard'), 
@@ -341,149 +356,10 @@ export function Map({ onPointCountChange }: MapProps) {
         })
         setBooleanFilterStates(newBooleanFilterStates)
         
-        const markers = L.markerClusterGroup({
-          chunkedLoading: true,
-          maxClusterRadius: config.map.clusterRadius,
-          spiderfyOnMaxZoom: true,
-          showCoverageOnHover: false,
-          zoomToBoundsOnClick: true
-        })
-
-        const initialMarkerColors = buildMarkerColorMap(allRecords, colorProperty)
-
-        markerClusterGroup.current = markers
-
-        let validPoints = 0
-        allRecords.forEach(record => {
-          if (record[config.geoDataField] && typeof record[config.geoDataField] === 'string') {
-            const parts = record[config.geoDataField].split(';')
-            if (parts.length === 2) {
-              const lat = parseFloat(parts[0])
-              const lng = parseFloat(parts[1])
-              
-              if (!isNaN(lat) && !isNaN(lng)) {
-                const markerCategory = getMarkerColorCategory(record, colorProperty)
-                const markerColor = initialMarkerColors.get(markerCategory)
-                  || initialMarkerColors.get('Unknown')
-                  || DEFAULT_MARKER_COLOR
-                const marker = L.marker([lat, lng], { icon: createMarkerIcon(markerColor) })
-                
-                const title = record[config.popup.titleField] || 'Untitled'
-                
-                const locations = [
-                  record.Location1,
-                  record.Location2,
-                  record.Location3
-                ].filter(loc => loc !== null && loc !== undefined && loc !== '').join(', ')
-                
-                const alwaysExcluded = [
-                  config.geoDataField, 
-                  'Id', 
-                  config.popup.titleField, 
-                  'CreatedAt', 
-                  'UpdatedAt',
-                  'Location1',
-                  'Location2',
-                  'Location3',
-                  ...(config.popup.imageField ? [config.popup.imageField] : [])
-                ]
-                
-                const displayFields = displayProperties.map(p => p.field)
-                
-                const popupContent = displayProperties
-                  .map(property => {
-                    const values = getPropertyValue(record, property)
-                    if (values.length > 0) {
-                      const label = getPropertyLabel(property.field)
-                      if (property.field === 'PleiadesId') {
-                        const pleiadesUrl = `https://pleiades.stoa.org/places/${values[0]}`
-                        return `<p><strong>${label}:</strong> <a href="${pleiadesUrl}" target="_blank" rel="noopener noreferrer" style="color: oklch(0.45 0.15 250); text-decoration: underline;">${values[0]}</a></p>`
-                      }
-                      const displayValue = values.map(v => parseMarkdown(String(v))).join(', ')
-                      return `<p><strong>${label}:</strong> ${displayValue}</p>`
-                    }
-                    return ''
-                  })
-                  .filter(Boolean)
-                  .join('')
-                
-                const locationsHtml = locations ? `<p><strong>Locations:</strong> ${locations}</p>` : ''
-                
-                const popupElement = document.createElement('div')
-                popupElement.innerHTML = `<div><h3>${title}</h3>${locationsHtml}${popupContent}</div>`
-                
-                if (config.popup.imageField && record[config.popup.imageField] && Array.isArray(record[config.popup.imageField]) && record[config.popup.imageField].length > 0) {
-                  const imageContainer = document.createElement('div')
-                  imageContainer.style.marginTop = '12px'
-                  imageContainer.style.display = 'flex'
-                  imageContainer.style.gap = '8px'
-                  imageContainer.style.flexWrap = 'wrap'
-                  
-                  record[config.popup.imageField].forEach((img: ImageData) => {
-                    if (img.signedPath) {
-                      const imgWrapper = document.createElement('div')
-                      imgWrapper.style.width = '120px'
-                      imgWrapper.style.height = '120px'
-                      imgWrapper.style.borderRadius = 'var(--radius)'
-                      imgWrapper.style.overflow = 'hidden'
-                      imgWrapper.style.cursor = 'pointer'
-                      imgWrapper.style.border = '2px solid oklch(0.88 0.01 250)'
-                      imgWrapper.style.transition = 'transform 0.2s'
-                      
-                      imgWrapper.addEventListener('mouseenter', () => {
-                        imgWrapper.style.transform = 'scale(1.05)'
-                      })
-                      imgWrapper.addEventListener('mouseleave', () => {
-                        imgWrapper.style.transform = 'scale(1)'
-                      })
-                      
-                      const imgElement = document.createElement('img')
-                      imgElement.style.width = '100%'
-                      imgElement.style.height = '100%'
-                      imgElement.style.objectFit = 'cover'
-                      imgElement.alt = 'Point image'
-                      
-                      cacheImage(img.signedPath).then(url => {
-                        imgElement.src = url
-                      })
-                      
-                      imgWrapper.addEventListener('click', () => {
-                        cacheImage(img.signedPath!).then(url => {
-                          window.open(url, '_blank')
-                        })
-                      })
-                      
-                      imgWrapper.appendChild(imgElement)
-                      imageContainer.appendChild(imgWrapper)
-                    }
-                  })
-                  
-                  popupElement.appendChild(imageContainer)
-                }
-
-                marker.bindPopup(popupElement, {
-                  maxWidth: config.popup.width || 300
-                })
-
-                markers.addLayer(marker)
-                markerMapRef.current.set(record.Id, marker)
-                validPoints++
-              }
-            }
-          }
-        })
-
-        map.addLayer(markers)
-        
         if (config.debug.showConsoleLog) {
-          console.log(`Loaded ${allRecords.length} records, ${validPoints} with valid coordinates`)
-        }
-        
-        if (validPoints > 0 && markers.getBounds().isValid()) {
-          map.fitBounds(markers.getBounds(), { padding: [50, 50] })
+          console.log(`Loaded ${allRecords.length} records`)
         }
 
-        onPointCountChange?.(validPoints)
         setLoading(false)
       } catch (err) {
         if (config.debug.showConsoleLog) {
@@ -503,9 +379,14 @@ export function Map({ onPointCountChange }: MapProps) {
   }, [])
 
   useEffect(() => {
-    if (!mapInstance.current || !markerClusterGroup.current || !apiData) return
+    if (!mapInstance.current || !apiData) return
 
-    markerClusterGroup.current.clearLayers()
+    if (markerLayerGroup.current) {
+      mapInstance.current.removeLayer(markerLayerGroup.current)
+    }
+
+    const markerLayer = createMarkerLayerGroup(clustersEnabled)
+    markerLayerGroup.current = markerLayer
     markerMapRef.current.clear()
 
     let validPoints = 0
@@ -638,7 +519,7 @@ export function Map({ onPointCountChange }: MapProps) {
               maxWidth: config.popup.width || 300
             })
 
-            markerClusterGroup.current!.addLayer(marker)
+            markerLayer.addLayer(marker)
             markerMapRef.current.set(record.Id, marker)
             validPoints++
           }
@@ -646,12 +527,25 @@ export function Map({ onPointCountChange }: MapProps) {
       }
     })
 
-    if (validPoints > 0 && markerClusterGroup.current.getBounds().isValid()) {
-      mapInstance.current.fitBounds(markerClusterGroup.current.getBounds(), { padding: [50, 50] })
+    mapInstance.current.addLayer(markerLayer)
+
+    if (validPoints > 0 && markerLayer.getBounds().isValid()) {
+      mapInstance.current.fitBounds(markerLayer.getBounds(), { padding: [50, 50] })
     }
 
     onPointCountChange?.(validPoints)
-  }, [filterStates, booleanFilterStates, apiData, onPointCountChange, standardFilterProperties, booleanFilterProperties, displayProperties, colorProperty, markerColorsByCategory])
+  }, [
+    filterStates,
+    booleanFilterStates,
+    apiData,
+    onPointCountChange,
+    standardFilterProperties,
+    booleanFilterProperties,
+    displayProperties,
+    colorProperty,
+    markerColorsByCategory,
+    clustersEnabled
+  ])
 
   const handleFilterToggle = (field: string, value: string) => {
     setFilterStates(prev => {
@@ -769,6 +663,17 @@ export function Map({ onPointCountChange }: MapProps) {
       />
       
       <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+        <div className="bg-card border border-border rounded-lg shadow-lg px-3 py-2 flex items-center gap-2">
+          <Label htmlFor="clusters-toggle" className="text-xs font-medium cursor-pointer">
+            Clusters
+          </Label>
+          <Switch
+            id="clusters-toggle"
+            checked={clustersEnabled}
+            onCheckedChange={setClustersEnabled}
+          />
+        </div>
+
         <Dialog open={showOpenById} onOpenChange={setShowOpenById}>
           <DialogTrigger asChild>
             <Button
