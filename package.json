@@ -10,7 +10,8 @@
         "lint": "eslint .",
         "optimize": "vite optimize",
         "preview": "vite preview",
-        "start": "npm run build && node server.mjs"
+        "serve": "node server.mjs",
+        "start": "npm run build && npm run serve"
     },
     "dependencies": {
         "@heroicons/react": "^2.2.0",

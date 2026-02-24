@@ -56,6 +56,12 @@ npm run start
 
 The `start` script builds the app and then runs `server.mjs` on port `3000`.
 
+If you already built the app and only want to run the static server:
+
+```bash
+npm run serve
+```
+
 ### Option 2 — Docker deployment
 
 ```bash
@@ -64,3 +70,5 @@ docker run -p 3000:3000 eddb-simplemap
 ```
 
 App: `http://localhost:3000`
+
+The container runtime starts `npm run serve` (no rebuild in runtime image).
