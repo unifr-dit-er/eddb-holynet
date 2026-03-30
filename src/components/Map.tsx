@@ -259,11 +259,12 @@ export function Map({ onPointCountChange }: MapProps) {
   useEffect(() => {
     if (!mapContainer.current || mapInstance.current) return
 
-    const map = L.map(mapContainer.current).setView(config.map.defaultCenter as [number, number], config.map.defaultZoom)
+    const map = L.map(mapContainer.current, { maxZoom: 22 }).setView(config.map.defaultCenter as [number, number], config.map.defaultZoom)
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19
+      maxNativeZoom: 19,
+      maxZoom: 22
     }).addTo(map)
 
     mapInstance.current = map
