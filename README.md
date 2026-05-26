@@ -7,68 +7,56 @@ EDDB Holynet is an interactive web mapping application built with React + Vite.
 It lets you:
 - display geographic points from a NocoDB API;
 - filter results;
-- view details in popups;
-- deploy an instance quickly in production.
+- view details in popups.
 
 Main configuration is handled in `src/config.ts`.
 
-## Installation (and update)
+## Development
 
 ### Prerequisites
 
 - Node.js 22 (recommended)
 - npm
 
-### First-time installation
+### Setup
 
 ```bash
 npm install
 npm run dev
 ```
 
-Development app: `http://localhost:5173`
+App: `http://localhost:5173`
 
-### Update an existing instance
+### Update
 
 ```bash
 git pull
 npm install
 ```
 
-Then restart depending on your need:
+## Production deployment with Podman
+
+### Build the image
 
 ```bash
-# development
-npm run dev
-
-# verification build
-npm run build
+podman build -t eddb-holynet .
 ```
 
-## Production deployment
-
-### Option 1 — Direct start (Node)
+### Run the container
 
 ```bash
-npm install
-npm run start
-```
-
-The `start` script builds the app and then runs `server.mjs` on port `3000`.
-
-If you already built the app and only want to run the static server:
-
-```bash
-npm run serve
-```
-
-### Option 2 — Docker deployment
-
-```bash
-docker build -t eddb-simplemap .
-docker run -p 3000:3000 eddb-simplemap
+podman run -d -p 3000:3000 --name eddb-holynet eddb-holynet
 ```
 
 App: `http://localhost:3000`
 
-The container runtime starts `npm run serve` (no rebuild in runtime image).
+The image builds the app at build time and serves the static files via `server.mjs` on port 3000.
+
+### Update
+
+```bash
+git pull
+podman build -t eddb-holynet .
+podman stop eddb-holynet && podman rm eddb-holynet
+podman run -d -p 3000:3000 --name eddb-holynet eddb-holynet
+```
