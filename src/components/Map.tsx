@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import L from 'leaflet'
 import 'leaflet.markercluster'
-import { Bug, X, Funnel, ArrowCounterClockwise, Crosshair, Image } from '@phosphor-icons/react'
+import { Bug, X, Funnel, ArrowCounterClockwise, Crosshair, Image, MagnifyingGlass } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -204,6 +204,8 @@ export function Map({ onPointCountChange }: MapProps) {
   const [clustersEnabled, setClustersEnabled] = useState(true)
   const [showOpenById, setShowOpenById] = useState(false)
   const [inputId, setInputId] = useState('')
+  const [showSearchByDenomination, setShowSearchByDenomination] = useState(false)
+  const [searchDenomination, setSearchDenomination] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<string>('')
 
   const createMarkerLayerGroup = (useClusters: boolean): L.MarkerClusterGroup | L.FeatureGroup<L.Marker> => {
@@ -628,6 +630,36 @@ export function Map({ onPointCountChange }: MapProps) {
     })
   }
 
+  const denominationSearchResults = useMemo(() => {
+    const query = searchDenomination.trim().toLowerCase()
+    if (!query || !apiData) return []
+    return apiData
+      .filter(record => {
+        const denomination = record[config.popup.titleField]
+        return denomination && String(denomination).toLowerCase().includes(query)
+      })
+      .slice(0, 50)
+  }, [searchDenomination, apiData])
+
+  const openMarkerOnMap = (marker: L.Marker) => {
+    if (!mapInstance.current) return
+    const layer = markerLayerGroup.current
+    if (layer && 'zoomToShowLayer' in layer) {
+      (layer as L.MarkerClusterGroup).zoomToShowLayer(marker, () => marker.openPopup())
+    } else {
+      mapInstance.current.setView(marker.getLatLng(), 18)
+      marker.openPopup()
+    }
+  }
+
+  const handleSelectDenominationResult = (recordId: number) => {
+    const marker = markerMapRef.current.get(recordId)
+    if (!marker) return
+    openMarkerOnMap(marker)
+    setShowSearchByDenomination(false)
+    setSearchDenomination('')
+  }
+
   const handleOpenById = () => {
     const id = parseInt(inputId.trim())
     
@@ -643,11 +675,8 @@ export function Map({ onPointCountChange }: MapProps) {
       return
     }
 
-    const latLng = marker.getLatLng()
-    
     if (mapInstance.current) {
-      mapInstance.current.setView(latLng, 18)
-      marker.openPopup()
+      openMarkerOnMap(marker)
       setShowOpenById(false)
       setInputId('')
       toast.success(`Opened point with ID: ${id}`)
@@ -723,6 +752,58 @@ export function Map({ onPointCountChange }: MapProps) {
                   Open Point
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showSearchByDenomination} onOpenChange={(open) => {
+          setShowSearchByDenomination(open)
+          if (!open) setSearchDenomination('')
+        }}>
+          <DialogTrigger asChild>
+            <Button
+              className="shadow-lg"
+              size="sm"
+              variant="secondary"
+            >
+              <MagnifyingGlass size={18} weight="fill" className="mr-2" />
+              Search
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Search by {config.popup.titleField}</DialogTitle>
+              <DialogDescription>
+                Enter a name to find matching sites on the map.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <Input
+                autoFocus
+                placeholder={`Search ${config.popup.titleField}...`}
+                value={searchDenomination}
+                onChange={(e) => setSearchDenomination(e.target.value)}
+              />
+              {searchDenomination.trim() && (
+                <div className="border border-border rounded-md overflow-auto max-h-64">
+                  {denominationSearchResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-3 py-2">No results found.</p>
+                  ) : (
+                    <ul>
+                      {denominationSearchResults.map(record => (
+                        <li key={record.Id}>
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                            onClick={() => handleSelectDenominationResult(record.Id)}
+                          >
+                            {record[config.popup.titleField]}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
