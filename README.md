@@ -1,8 +1,8 @@
-# EDDB Simplemap
+# EDDB Holynet
 
 ## Overview
 
-EDDB Simplemap is an interactive web mapping application built with React + Vite.
+EDDB Holynet is an interactive web mapping application built with React + Vite.
 
 It lets you:
 - display geographic points from a NocoDB API;
