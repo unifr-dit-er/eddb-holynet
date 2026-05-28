@@ -169,7 +169,7 @@ export const config: AppConfig = {
   
   debug: {
     enabled: false,
-    showConsoleLog: true
+    showConsoleLog: false
   },
   
   map: {
