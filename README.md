@@ -36,27 +36,28 @@ npm install
 
 ## Production deployment with Podman
 
+The image builds the app at build time and serves the static files via `server.mjs` on port 3000.
+
 ### Build the image
 
 ```bash
 podman build -t eddb-holynet .
 ```
 
-### Run the container
+### Run as a systemd service (Quadlet)
+
+A Quadlet unit file is provided in [deploy/eddb-holynet.container](deploy/eddb-holynet.container). It exposes the app on `127.0.0.1:8095`.
 
 ```bash
-podman run -d -p 3000:3000 --name eddb-holynet eddb-holynet
+cp deploy/eddb-holynet.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user start eddb-holynet
 ```
-
-App: `http://localhost:3000`
-
-The image builds the app at build time and serves the static files via `server.mjs` on port 3000.
 
 ### Update
 
 ```bash
 git pull
 podman build -t eddb-holynet .
-podman stop eddb-holynet && podman rm eddb-holynet
-podman run -d -p 3000:3000 --name eddb-holynet eddb-holynet
+systemctl --user restart eddb-holynet
 ```

@@ -1,0 +1,16 @@
+[Unit]
+Description=Eddb Holynet Container
+
+[Container]
+Label=app=eddb-holynet
+ContainerName=eddb-holynet
+Image=localhost/eddb-holynet:latest
+PublishPort=127.0.0.1:8095:3000
+# Network=holynet.network
+Environment=EXAMPLE_ENV_VAR=hello
+
+[Service]
+ExecStartPre=/usr/bin/podman rm -f eddb-holynet
+
+[Install]
+WantedBy=default.target
