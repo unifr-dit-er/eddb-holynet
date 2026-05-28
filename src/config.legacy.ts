@@ -1,3 +1,5 @@
+// used by project Ludus
+
 export interface StandardFilterType {
   type: 'standard'
   shortLabel?: string

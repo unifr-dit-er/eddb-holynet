@@ -308,8 +308,45 @@ export function Map({ onPointCountChange }: MapProps) {
           offset += limit
         }
 
+        if (config.popup.imageLinkedTable && config.popup.imageField) {
+          const { apiUrl, attachmentField, foreignKey } = config.popup.imageLinkedTable
+          const imageField = config.popup.imageField
+          let visualRecords: any[] = []
+          let visualOffset = 0
+
+          while (true) {
+            const visualResponse = await fetch(
+              `${apiUrl}?limit=${limit}&offset=${visualOffset}`,
+              { headers: { 'xc-token': config.apiToken } }
+            )
+            if (!visualResponse.ok) break
+            const visualData = await visualResponse.json()
+            if (!visualData.list || visualData.list.length === 0) break
+            visualRecords = visualRecords.concat(visualData.list)
+            if (visualData.list.length < limit) break
+            visualOffset += limit
+          }
+
+          const visualsByParent = new globalThis.Map<number, any[]>()
+          for (const v of visualRecords) {
+            const parentId = v[foreignKey]
+            if (parentId != null) {
+              if (!visualsByParent.has(parentId)) visualsByParent.set(parentId, [])
+              visualsByParent.get(parentId)!.push({ [attachmentField]: v[attachmentField] ?? [] })
+            }
+          }
+
+          for (const record of allRecords) {
+            record[imageField] = visualsByParent.get(record.Id) ?? []
+          }
+
+          if (config.debug.showConsoleLog) {
+            console.log(`Loaded ${visualRecords.length} visual records`)
+          }
+        }
+
         setApiData(allRecords)
-        
+
         const newFilterStates: Record<string, FilterState> = {}
         
         standardFilterProperties.forEach(property => {
@@ -470,13 +507,25 @@ export function Map({ onPointCountChange }: MapProps) {
             popupElement.innerHTML = `<div><h3>${title}</h3>${locationsHtml}${popupContent}</div>`
             
             if (config.popup.imageField && record[config.popup.imageField] && Array.isArray(record[config.popup.imageField]) && record[config.popup.imageField].length > 0) {
+              const fieldData = record[config.popup.imageField]
+              const images: ImageData[] = []
+              for (const item of fieldData) {
+                if (item.signedPath) {
+                  images.push(item)
+                } else if (item.Attachment && Array.isArray(item.Attachment)) {
+                  for (const att of item.Attachment) {
+                    if (att.signedPath) images.push(att)
+                  }
+                }
+              }
+
               const imageContainer = document.createElement('div')
               imageContainer.style.marginTop = '12px'
               imageContainer.style.display = 'flex'
               imageContainer.style.gap = '8px'
               imageContainer.style.flexWrap = 'wrap'
-              
-              record[config.popup.imageField].forEach((img: ImageData) => {
+
+              images.forEach((img: ImageData) => {
                 if (img.signedPath) {
                   const imgWrapper = document.createElement('div')
                   imgWrapper.style.width = '120px'

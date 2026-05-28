@@ -41,6 +41,11 @@ export interface AppConfig {
     titleField: string
     width?: number
     imageField?: string
+    imageLinkedTable?: {
+      apiUrl: string
+      attachmentField: string
+      foreignKey: string
+    }
   }
   filterMenu: {
     type: FilterMenuType
@@ -155,7 +160,8 @@ export const config: AppConfig = {
         type: 'boolean',
         checkFunction: (record: any) => {
           const imageField = 'Visuals'
-          return record[imageField] && Array.isArray(record[imageField]) && record[imageField].length > 0 && record[imageField].some((img: any) => img.signedPath)
+          return record[imageField] && Array.isArray(record[imageField]) && record[imageField].length > 0 &&
+            record[imageField].some((visual: any) => visual.Attachment && Array.isArray(visual.Attachment) && visual.Attachment.some((img: any) => img.signedPath))
         }
       }
     }
@@ -178,9 +184,14 @@ export const config: AppConfig = {
   popup: {
     titleField: 'Denomination',
     width: 500,
-    imageField: 'Visuals'
+    imageField: 'Visuals',
+    imageLinkedTable: {
+      apiUrl: 'https://eddb.unifr.ch/noco/api/v2/tables/mwqz9h80g3xc6x3/records',
+      attachmentField: 'Attachment',
+      foreignKey: 'Sites_id'
+    }
   },
-  
+
   filterMenu: {
     type: 'dropdown'
   },
