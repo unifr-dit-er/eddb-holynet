@@ -8,7 +8,7 @@ const projectRoot = import.meta.dirname
 
 // https://vite.dev/config/
 export default defineConfig({
-  //base: '/project/',
+  base: '/holynet/',
   plugins: [
     react(),
     tailwindcss(),
