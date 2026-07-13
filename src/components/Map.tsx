@@ -60,6 +60,7 @@ const FIELD_OPTION_ORDER: Record<string, string[]> = {
   ]
 }
 const CHRONOLOGICAL_FILTER_FIELDS = new Set(Object.keys(FIELD_OPTION_ORDER))
+const SEARCH_FIELDS = [config.popup.titleField, 'TownVillage']
 
 function getPropertyLabel(field: string): string {
   const property = config.properties.find(p => p.field === field)
@@ -224,8 +225,8 @@ export function Map({ onPointCountChange }: MapProps) {
   const [clustersEnabled, setClustersEnabled] = useState(true)
   const [showOpenById, setShowOpenById] = useState(false)
   const [inputId, setInputId] = useState('')
-  const [showSearchByDenomination, setShowSearchByDenomination] = useState(false)
-  const [searchDenomination, setSearchDenomination] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<string>('')
 
   const createMarkerLayerGroup = (useClusters: boolean): L.MarkerClusterGroup | L.FeatureGroup<L.Marker> => {
@@ -700,16 +701,19 @@ export function Map({ onPointCountChange }: MapProps) {
     })
   }
 
-  const denominationSearchResults = useMemo(() => {
-    const query = searchDenomination.trim().toLowerCase()
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
     if (!query || !apiData) return []
+
     return apiData
-      .filter(record => {
-        const denomination = record[config.popup.titleField]
-        return denomination && String(denomination).toLowerCase().includes(query)
-      })
+      .filter(record =>
+        SEARCH_FIELDS.some(field => {
+          const value = record[field]
+          return value && String(value).toLowerCase().includes(query)
+        })
+      )
       .slice(0, 50)
-  }, [searchDenomination, apiData])
+  }, [searchQuery, apiData])
 
   const openMarkerOnMap = (marker: L.Marker) => {
     if (!mapInstance.current) return
@@ -722,12 +726,12 @@ export function Map({ onPointCountChange }: MapProps) {
     }
   }
 
-  const handleSelectDenominationResult = (recordId: number) => {
+  const handleSelectSearchResult = (recordId: number) => {
     const marker = markerMapRef.current.get(recordId)
     if (!marker) return
     openMarkerOnMap(marker)
-    setShowSearchByDenomination(false)
-    setSearchDenomination('')
+    setShowSearch(false)
+    setSearchQuery('')
   }
 
   const handleOpenById = () => {
@@ -826,9 +830,9 @@ export function Map({ onPointCountChange }: MapProps) {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={showSearchByDenomination} onOpenChange={(open) => {
-          setShowSearchByDenomination(open)
-          if (!open) setSearchDenomination('')
+        <Dialog open={showSearch} onOpenChange={(open) => {
+          setShowSearch(open)
+          if (!open) setSearchQuery('')
         }}>
           <DialogTrigger asChild>
             <Button
@@ -840,9 +844,9 @@ export function Map({ onPointCountChange }: MapProps) {
               Search
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Search by {config.popup.titleField}</DialogTitle>
+              <DialogTitle>Search</DialogTitle>
               <DialogDescription>
                 Enter a name to find matching sites on the map.
               </DialogDescription>
@@ -850,27 +854,35 @@ export function Map({ onPointCountChange }: MapProps) {
             <div className="space-y-4 pt-4">
               <Input
                 autoFocus
-                placeholder={`Search ${config.popup.titleField}...`}
-                value={searchDenomination}
-                onChange={(e) => setSearchDenomination(e.target.value)}
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-              {searchDenomination.trim() && (
-                <div className="border border-border rounded-md overflow-auto max-h-64">
-                  {denominationSearchResults.length === 0 ? (
+              {searchQuery.trim() && (
+                <div className="border border-border rounded-md overflow-auto max-h-[60vh]">
+                  {searchResults.length === 0 ? (
                     <p className="text-sm text-muted-foreground px-3 py-2">No results found.</p>
                   ) : (
-                    <ul>
-                      {denominationSearchResults.map(record => (
-                        <li key={record.Id}>
-                          <button
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                            onClick={() => handleSelectDenominationResult(record.Id)}
-                          >
-                            {record[config.popup.titleField]}
-                          </button>
-                        </li>
+                    <div>
+                      <div className="grid grid-cols-[2fr_1fr] border-b border-border sticky top-0 bg-card">
+                        <span className="text-left font-medium text-xs text-muted-foreground px-3 py-2">
+                          {getPropertyLabel(config.popup.titleField)}
+                        </span>
+                        <span className="text-left font-medium text-xs text-muted-foreground px-3 py-2">
+                          {getPropertyLabel('TownVillage')}
+                        </span>
+                      </div>
+                      {searchResults.map(record => (
+                        <button
+                          key={record.Id}
+                          className="w-full grid grid-cols-[2fr_1fr] text-left hover:bg-accent hover:text-accent-foreground transition-colors"
+                          onClick={() => handleSelectSearchResult(record.Id)}
+                        >
+                          <span className="px-3 py-2 truncate">{record[config.popup.titleField]}</span>
+                          <span className="px-3 py-2 truncate text-muted-foreground">{record['TownVillage']}</span>
+                        </button>
                       ))}
-                    </ul>
+                    </div>
                   )}
                 </div>
               )}
