@@ -47,10 +47,18 @@ const MARKER_CENTER_COLOR = 'oklch(0.98 0 0)'
 const UNKNOWN_MARKER_COLOR = 'hsl(220 8% 45%)'
 const DEFAULT_COLOR_CATEGORY = '__default__'
 const GOLDEN_ANGLE = 137.508
+const UNKNOWN_LABEL_FIELDS = new Set(['TimeOfEmergence'])
 
 function getPropertyLabel(field: string): string {
   const property = config.properties.find(p => p.field === field)
   return property?.label || field
+}
+
+function getFilterValueLabel(field: string, value: string): string {
+  if (value === 'Unknown' && !UNKNOWN_LABEL_FIELDS.has(field)) {
+    return 'Other'
+  }
+  return value
 }
 
 async function cacheImage(signedPath: string): Promise<string> {
@@ -1022,7 +1030,7 @@ export function Map({ onPointCountChange }: MapProps) {
                               htmlFor={`${property.field}-${value}`}
                               className="text-sm font-normal cursor-pointer flex-1"
                             >
-                              {value}
+                              {getFilterValueLabel(property.field, value)}
                             </Label>
                             <span className="text-xs text-muted-foreground font-medium">
                               {state.counts[value] || 0}
@@ -1126,7 +1134,7 @@ export function Map({ onPointCountChange }: MapProps) {
                               htmlFor={`${property.field}-${value}`}
                               className="text-sm font-normal cursor-pointer flex-1"
                             >
-                              {value}
+                              {getFilterValueLabel(property.field, value)}
                             </Label>
                             <span className="text-xs text-muted-foreground font-medium">
                               {state.counts[value] || 0}
