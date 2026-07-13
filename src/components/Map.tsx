@@ -47,7 +47,19 @@ const MARKER_CENTER_COLOR = 'oklch(0.98 0 0)'
 const UNKNOWN_MARKER_COLOR = 'hsl(220 8% 45%)'
 const DEFAULT_COLOR_CATEGORY = '__default__'
 const GOLDEN_ANGLE = 137.508
-const UNKNOWN_LABEL_FIELDS = new Set(['TimeOfEmergence'])
+const FIELD_OPTION_ORDER: Record<string, string[]> = {
+  TimeOfEmergence: [
+    'Pre-Roman (before 4 BCE)',
+    'Roman (before 326 CE)',
+    'Byzantine (326-638)',
+    'Early Islamic (638-1099)',
+    'Crusader (1099-1187)',
+    'Ayyubid (1187-1250)',
+    'Mamluk (1250-1517)',
+    'Ottoman (1517-1917)'
+  ]
+}
+const CHRONOLOGICAL_FILTER_FIELDS = new Set(Object.keys(FIELD_OPTION_ORDER))
 
 function getPropertyLabel(field: string): string {
   const property = config.properties.find(p => p.field === field)
@@ -55,7 +67,7 @@ function getPropertyLabel(field: string): string {
 }
 
 function getFilterValueLabel(field: string, value: string): string {
-  if (value === 'Unknown' && !UNKNOWN_LABEL_FIELDS.has(field)) {
+  if (value === 'Unknown' && !CHRONOLOGICAL_FILTER_FIELDS.has(field)) {
     return 'Other'
   }
   return value
@@ -359,17 +371,17 @@ export function Map({ onPointCountChange }: MapProps) {
         
         standardFilterProperties.forEach(property => {
           const countMap: Record<string, number> = {}
-          
+
           allRecords.forEach(record => {
             if (record[config.geoDataField] && typeof record[config.geoDataField] === 'string') {
               const parts = record[config.geoDataField].split(';')
               if (parts.length === 2) {
                 const lat = parseFloat(parts[0])
                 const lng = parseFloat(parts[1])
-                
+
                 if (!isNaN(lat) && !isNaN(lng)) {
                   const values = getPropertyValue(record, property)
-                  
+
                   if (values.length === 0) {
                     countMap['Unknown'] = (countMap['Unknown'] || 0) + 1
                   } else {
@@ -381,11 +393,12 @@ export function Map({ onPointCountChange }: MapProps) {
               }
             }
           })
-          
-          const uniqueValues = Object.keys(countMap)
-            .filter(v => v !== 'Unknown')
-            .sort()
-          const valuesWithUnknown = countMap['Unknown'] 
+
+          const fixedOrder = FIELD_OPTION_ORDER[property.field]
+          const uniqueValues = fixedOrder
+            ? fixedOrder.filter(v => countMap[v])
+            : Object.keys(countMap).filter(v => v !== 'Unknown').sort()
+          const valuesWithUnknown = countMap['Unknown']
             ? [...uniqueValues, 'Unknown']
             : uniqueValues
           
