@@ -10,7 +10,8 @@ PublishPort=127.0.0.1:8095:3000
 Environment=EXAMPLE_ENV_VAR=hello
 
 [Service]
-ExecStartPre=/usr/bin/podman rm -f eddb-holynet
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=default.target
