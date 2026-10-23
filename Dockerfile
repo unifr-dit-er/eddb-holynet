@@ -9,7 +9,7 @@ RUN npm run build
 
 
 # ---- Runtime stage ----
-FROM node:22-alpine3.19
+FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /usr/src/app
 
