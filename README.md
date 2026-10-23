@@ -11,6 +11,12 @@ It lets you:
 
 Main configuration is handled in `src/config.ts`.
 
+The code started as the Ludus map (https://eddb.unifr.ch/ludus/). The
+version deployed for Ludus is tagged `ludus` (commit `e8de4ff`, 21.10.2025,
+configuration `src/config.ludus.ts`); `main` has diverged since. To rebuild
+Ludus, check out the tag and replace `node:22-alpine3.19` with
+`node:22-alpine` in its Dockerfile.
+
 ## Development
 
 ### Prerequisites
